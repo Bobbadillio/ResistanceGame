@@ -1,15 +1,17 @@
 from random import sample, random #used to select spies
-from players import dullMuteDeaf as playerBot # dullMuteDeaf is a bad AI
+from mission import Mission
+from GameState import GameState
+#from KellyAIs import dullMuteDeaf as playerBot # dullMuteDeaf is a bad AI
 
 class ResistanceGame():
 
-    def setMissionList(self):
+    def setPlanList(self):
         # missionList returns the default list of missions for the game 
         # resistance. missions are represented as:
         # (number of players,number of fails required for sabotage)
         n = len(self.players)
         if n in [5,6,7,8,9,10]:
-            missionList = {
+            planList = {
                 5 :[(2,1),(3,1),(2,1),(3,1),(3,1)],
                 6 :[(2,1),(3,1),(4,1),(3,1),(4,1)],
                 7 :[(2,1),(3,1),(3,1),(4,2),(4,1)],
@@ -18,12 +20,12 @@ class ResistanceGame():
                 10:[(3,1),(4,1),(4,1),(5,2),(5,1)]
                 }[n]
         else:
-            missions = []
+            plan = []
             print "Error: Expected a value in [5,10]. for n in missionList function of Class ResistanceGame Given: {}".format(n)
-        self.missions = missionList
+        self.plans = planList
         
-    def getMission(self,n):
-        return self.missions[n]
+    def getPlan(self,n):
+        return self.plans[n]
 
     def getRandomPlayer(self):
         # getRandomPlayer generates a random number then uses that random 
@@ -67,23 +69,19 @@ class ResistanceGame():
 
     def __init__(self,playerList):
         self.players = playerList
-        self.setMissionList()
+        self.setPlanList()
         self.setTeams()
         #game is started by random player
         self.leaderIndex = self.getRandomPlayerIndex()
         self.nSuccess =0
         self.nFail = 0
         self.missionCounter=0
+        self.gameState = GameState(playerList)
         
-    def succeedMission(self):
-        self.nSuccess +=1
         
-    def failMission(self):
-        self.nFail +=1
 
-    def isOver(self):
-        if (self.nSuccess==3) or (self.nFail==3):
-            return True
+
+
 
     def getResult(self):
         nSuccess = self.nSuccess
@@ -101,45 +99,41 @@ class ResistanceGame():
         else:
             return "Game does not appear to be over. Current state is:\n Resistance:{} \tSpies:{}".format(nSuccess,nFail)
 
-    def evaluateMission(self,thrownCards,mission):
-        if len(thrownCards)!=mission[0]:
-            raise ValueError("Expected {} cards, given {}".format(mission[0],len(thrownCards)))
-        
-        requiredFails = mission[1]
-        nFails = sum(1 for card in thrownCards if not(card))
-        
-        if nFails>=requiredFails:
-            self.failMission()
-        else:
-            self.succeedMission()
-        return
+
         
 
     def round(self):
         nPlayers = len(self.players)
         voteCounter = 0
         #set up the mission
-        mission=self.getMission(self.missionCounter)
+        plan=self.getPlan(self.missionCounter)
+        for player in self.players:
+            player.setState(self.gameState)
         while voteCounter<5:
             #maybe players communicate somehow 
             #leader proposes a mission
            
             leader = self.getLeader()
-            team = [self.players[i] for i in leader.proposeTeam(mission)]
+            team = leader.proposeTeam(plan,self.players)
             #Display option:
             #print "proposal #{}:".format(voteCounter+1), " ".join([player.name for player in team])
 
             #every player votes
-            votes = [player.vote() for player in self.players]
+            votes = [player.vote(team) for player in self.players]
+            nApprove = sum(1 for vote in votes if vote)
+            nReject = sum(1 for vote in votes if not(vote))
             #leader counter increments
             self.incrementLeaderCounter()
         
-            #if everyone approves:
-            if all(votes):
-            #  ask players for success/fail
-                cards = [player.throwCard() for player in team]
-            #  evaluate if mission succeeds/fails
-                self.evaluateMission(cards,mission)
+            #if mission is approved
+            if nApprove>nReject:
+                # make a mission for the proposed team
+                thisMission = Mission(team,plan)
+                # run the mission
+                thisMission.run()
+                # add it to the game state's mission list
+                
+                self.gameState.addMission(thisMission)
                 self.missionCounter+=1
                 return
             else:
@@ -147,15 +141,19 @@ class ResistanceGame():
                 voteCounter+=1
             if voteCounter>=5:
                 # Missions fail after 5 tries
-                self.failMission()
+                thisMission = Mission([],plan)
+                this.Mission.result='fail'
+                self.gameState.addMission(thisMission)
+                return
 
     def play(self):
         for i in range(5):
-
+#            print "\n=========================="
+#            print "beginning round {}".format(i+1)
             self.round()     
-            print "\nAfter mission {}, score stands at \n Spies:{}\tResistance:{}".format(i+1,self.nFail,self.nSuccess)       
-            if self.isOver():
-                return self.getResult()
+#            print "\n=========================="
+            if self.gameState.isOver():
+                return self.gameState
             
             
         

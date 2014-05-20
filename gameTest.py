@@ -1,20 +1,23 @@
+#!/usr/bin/env python
 from game import ResistanceGame
-from players import dullMuteDeaf
+from KellyAIs import dullMuteDeaf
 
 
 nSpies =0
 nRes = 0
 nGames = 10000
-nPlayers = 10
-players = [dullMuteDeaf("bot"+str(i)) for i in range(10)]
+nPlayers = 8
+players = [dullMuteDeaf("bot"+str(i)) for i in range(nPlayers)]
 
 winCount = {player.getName():[0,0] for player in players}
 for i in xrange(nGames):
     
     game = ResistanceGame(players)
-    winnerNames = game.play()
-    print " ".join(winnerNames)
-    if len(winnerNames)==4:
+    finalState = game.play()
+    winners = finalState.getWinners()
+    winnerNames = [winner.getName() for winner in winners]
+    #print " ".join(winnerNames)
+    if winners[0].getRole()=="spy":
         nSpies+=1
         for winnerName in winnerNames:
             winCount[winnerName][1]+=1
